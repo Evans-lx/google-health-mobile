@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "google_health_mobile": {
+      "type": "http",
+      "url": "${GOOGLE_HEALTH_PUBLIC_URL}/mcp",
+      "headers": {
+        "Authorization": "Bearer ${GOOGLE_HEALTH_SERVICE_TOKEN}"
+      }
+    }
+  }
+}
