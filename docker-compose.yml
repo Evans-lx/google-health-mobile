@@ -1,0 +1,12 @@
+services:
+  google-health-mobile:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - google-health-data:/app/data
+
+volumes:
+  google-health-data:
