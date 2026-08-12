@@ -60,14 +60,16 @@ export class GoogleHealthClient {
 
     if (aggregate) {
       return this.request("POST", `/v4/users/me/dataTypes/${encodeURIComponent(dataType)}/dataPoints:dailyRollUp`, {
-        range: { startDate: start, endDate: nextDay(end) },
+        range: civilDateRange(start, nextDay(end)),
         windowSizeDays: 1,
         pageSize: Math.min(days, 90),
         dataSourceFamily: "users/me/dataSourceFamilies/all-sources"
       });
     }
-    const filter = `startTime >= ${startDate.toISOString()} AND endTime <= ${new Date(endDate.getTime() + 86_400_000).toISOString()}`;
-    const suffix = new URLSearchParams({ filter, pageSize: "100" });
+    const filter = dataPointFilter(dataType, start, nextDay(end));
+    const params: Record<string, string> = { filter, pageSize: "100" };
+    if (dataType === "sleep") params.dataSourceFamily = "users/me/dataSourceFamilies/google-wearables";
+    const suffix = new URLSearchParams(params);
     return this.request("GET", `/v4/users/me/dataTypes/${encodeURIComponent(dataType)}/dataPoints:reconcile?${suffix}`);
   }
 
@@ -149,6 +151,29 @@ function nextDay(value: string): string {
   const date = validateDate(value, "end");
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10);
+}
+
+export function civilDateRange(start: string, end: string) {
+  return { start: civilDateTime(start), end: civilDateTime(end) };
+}
+
+function civilDateTime(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return {
+    date: { year, month, day },
+    time: { hours: 0, minutes: 0, seconds: 0, nanos: 0 }
+  };
+}
+
+export function dataPointFilter(dataType: string, start: string, endExclusive: string): string {
+  const snake = dataType.replace(/-/g, "_");
+  if (dataType === "sleep") {
+    return `sleep.interval.civil_end_time >= "${start}" AND sleep.interval.civil_end_time < "${endExclusive}"`;
+  }
+  if (dataType.startsWith("daily-")) {
+    return `${snake}.date >= "${start}" AND ${snake}.date < "${endExclusive}"`;
+  }
+  return `${snake}.interval.civil_start_time >= "${start}" AND ${snake}.interval.civil_start_time < "${endExclusive}"`;
 }
 
 const SENSITIVE_KEYS = /^(access.?token|refresh.?token|authorization|email|name|display.?name|avatar|latitude|longitude|coordinates|route|gps)$/i;
