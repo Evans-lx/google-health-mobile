@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: google-health-mobile
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    plan: free
+    envVars:
+      - key: PUBLIC_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        sync: false
+      - key: SERVICE_TOKEN
+        sync: false
+      - key: SETUP_TOKEN
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: DATA_DIR
+        value: /app/data
