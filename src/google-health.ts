@@ -75,7 +75,7 @@ export class GoogleHealthClient {
 
   async summary(start: string, end: string): Promise<Record<string, unknown>> {
     const types = ["steps", "distance", "active-energy-burned", "sleep", "daily-resting-heart-rate", "weight", "body-fat"];
-    const settled = await Promise.allSettled(types.map((type) => this.query(type, start, end, type !== "sleep")));
+    const settled = await Promise.allSettled(types.map((type) => this.query(type, start, end, type !== "sleep" && !type.startsWith("daily-"))));
     return {
       period: { start, end },
       disclaimer: "Google Health API beta data. This is not medical advice.",
