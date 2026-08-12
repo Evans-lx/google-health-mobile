@@ -1,0 +1,24 @@
+{
+  "name": "google-health-mobile",
+  "version": "0.1.0",
+  "description": "Read personal Google Health data from ChatGPT Actions or remote MCP.",
+  "author": {
+    "name": "Local developer"
+  },
+  "license": "MIT",
+  "keywords": ["google-health", "fitbit", "mcp", "chatgpt-actions"],
+  "interface": {
+    "displayName": "Google Health Mobile",
+    "shortDescription": "Read your Google Health data safely.",
+    "longDescription": "A read-only personal Google Health bridge with a Custom GPT Actions API for ChatGPT mobile and a remote MCP endpoint.",
+    "developerName": "Local developer",
+    "category": "Lifestyle",
+    "capabilities": ["Read"],
+    "defaultPrompt": [
+      "总结我今天的步数、活动和热量。",
+      "分析我昨晚的睡眠和静息心率。",
+      "查看我最近七天的健康趋势。"
+    ]
+  },
+  "mcpServers": "./.mcp.json"
+}
