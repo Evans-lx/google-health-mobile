@@ -1,3 +1,31 @@
+import path from "node:path";
+ import test from "node:test";
+ import { issueState, verifyState } from "../src/auth.js";
+ import { EncryptedTokenStore } from "../src/crypto-store.js";
+-import { redact, validateDate } from "../src/google-health.js";
++import { civilDateRange, dataPointFilter, redact, validateDate } from "../src/google-health.js";
+ import { openApi } from "../src/openapi.js";
+ 
+ const config = { setupToken: "setup-secret" } as Parameters<typeof issueState>[0];
+@@ -32,6 +32,18 @@ test("date validation is strict", () => {
+   assert.throws(() => validateDate("2026-02-30", "start"));
+ });
+ 
++test("Google Health v4 ranges use CivilDateTime objects", () => {
++  assert.deepEqual(civilDateRange("2026-08-13", "2026-08-14"), {
++    start: { date: { year: 2026, month: 8, day: 13 }, time: { hours: 0, minutes: 0, seconds: 0, nanos: 0 } },
++    end: { date: { year: 2026, month: 8, day: 14 }, time: { hours: 0, minutes: 0, seconds: 0, nanos: 0 } }
++  });
++});
++
++test("Google Health v4 reconcile filters use data-type fields", () => {
++  assert.equal(dataPointFilter("sleep", "2026-08-13", "2026-08-14"), 'sleep.interval.civil_end_time >= "2026-08-13" AND sleep.interval.civil_end_time < "2026-08-14"');
++  assert.equal(dataPointFilter("daily-resting-heart-rate", "2026-08-13", "2026-08-14"), 'daily_resting_heart_rate.date >= "2026-08-13" AND daily_resting_heart_rate.date < "2026-08-14"');
++});
++
+ test("privacy redaction removes identity, tokens and location", () => {
+   assert.deepEqual(redact({ name: "A", access_token: "x", nested: { latitude: 1, bpm: 60 } }), { nested: { bpm: 60 } });
+ });
 import assert from "node:assert/strict";
 import { mkdtemp } from "node:fs/promises";
 import os from "node:os";
@@ -5,7 +33,7 @@ import path from "node:path";
 import test from "node:test";
 import { issueState, verifyState } from "../src/auth.js";
 import { EncryptedTokenStore } from "../src/crypto-store.js";
-import { redact, validateDate } from "../src/google-health.js";
+import { civilDateRange, dataPointFilter, redact, validateDate } from "../src/google-health.js";
 import { openApi } from "../src/openapi.js";
 
 const config = { setupToken: "setup-secret" } as Parameters<typeof issueState>[0];
@@ -30,6 +58,18 @@ test("encrypted token store does not persist plaintext", async () => {
 test("date validation is strict", () => {
   assert.equal(validateDate("2026-08-12", "start").toISOString().slice(0, 10), "2026-08-12");
   assert.throws(() => validateDate("2026-02-30", "start"));
+});
+
+test("Google Health v4 ranges use CivilDateTime objects", () => {
+  assert.deepEqual(civilDateRange("2026-08-13", "2026-08-14"), {
+    start: { date: { year: 2026, month: 8, day: 13 }, time: { hours: 0, minutes: 0, seconds: 0, nanos: 0 } },
+    end: { date: { year: 2026, month: 8, day: 14 }, time: { hours: 0, minutes: 0, seconds: 0, nanos: 0 } }
+  });
+});
+
+test("Google Health v4 reconcile filters use data-type fields", () => {
+  assert.equal(dataPointFilter("sleep", "2026-08-13", "2026-08-14"), 'sleep.interval.civil_end_time >= "2026-08-13" AND sleep.interval.civil_end_time < "2026-08-14"');
+  assert.equal(dataPointFilter("daily-resting-heart-rate", "2026-08-13", "2026-08-14"), 'daily_resting_heart_rate.date >= "2026-08-13" AND daily_resting_heart_rate.date < "2026-08-14"');
 });
 
 test("privacy redaction removes identity, tokens and location", () => {
