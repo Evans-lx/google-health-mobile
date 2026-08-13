@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { GoogleHealthClient } from "./google-health.js";
 
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const dataType = z.enum(["steps", "distance", "active-energy-burned", "total-calories", "active-minutes", "heart-rate", "daily-resting-heart-rate", "daily-heart-rate-variability", "sleep", "weight", "body-fat", "oxygen-saturation", "respiratory-rate"]);
+const dataType = z.enum(["steps", "distance", "active-energy-burned", "total-calories", "active-minutes", "heart-rate", "daily-resting-heart-rate", "daily-heart-rate-variability", "sleep", "exercise", "weight", "body-fat", "oxygen-saturation", "respiratory-rate"]);
 
 function result(value: unknown) {
   return { content: [{ type: "text" as const, text: JSON.stringify(value) }], structuredContent: value as Record<string, unknown> };
@@ -19,6 +19,10 @@ export function createMcpServer(client: GoogleHealthClient): McpServer {
     title: "Google Health summary", description: "Read a non-medical summary for a date range up to 90 days.",
     inputSchema: { start: date, end: date }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
   }, async ({ start, end }) => result(await client.summary(start, end)));
+  server.registerTool("google_health_exercises", {
+    title: "Google Health exercise sessions", description: "Read workouts recorded as exercise sessions, including available type, time, duration and summary metrics.",
+    inputSchema: { start: date, end: date }, annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
+  }, async ({ start, end }) => result(await client.exercises(start, end)));
   server.registerTool("google_health_data", {
     title: "Google Health data", description: "Read one supported health data type for a date range up to 90 days.",
     inputSchema: { data_type: dataType, start: date, end: date, aggregate: z.boolean().default(true) },
