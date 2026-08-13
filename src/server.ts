@@ -37,6 +37,7 @@ export function createApp() {
   api.use(requireServiceToken(config));
   api.get("/status", async (_req, res, next) => { try { res.json(await client.status()); } catch (error) { next(error); } });
   api.get("/summary", async (req, res, next) => { try { res.json(await client.summary(String(req.query.start), String(req.query.end))); } catch (error) { next(error); } });
+  api.get("/exercises", async (req, res, next) => { try { res.json(await client.exercises(String(req.query.start), String(req.query.end))); } catch (error) { next(error); } });
   api.get("/data/:dataType", async (req, res, next) => { try {
     const aggregate = String(req.query.aggregate ?? "true") !== "false";
     res.json({ data_type: req.params.dataType, start: req.query.start, end: req.query.end, data: await client.query(req.params.dataType, String(req.query.start), String(req.query.end), aggregate) });
