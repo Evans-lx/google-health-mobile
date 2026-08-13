@@ -7,8 +7,10 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const ALLOWED_DATA_TYPES = new Set([
   "steps", "distance", "active-energy-burned", "total-calories", "active-minutes",
   "heart-rate", "daily-resting-heart-rate", "daily-heart-rate-variability",
-  "sleep", "weight", "body-fat", "oxygen-saturation", "respiratory-rate"
+  "sleep", "exercise", "weight", "body-fat", "oxygen-saturation", "respiratory-rate"
 ]);
+
+const SESSION_DATA_TYPES = new Set(["sleep", "exercise"]);
 
 export class GoogleHealthClient {
   readonly store: EncryptedTokenStore;
@@ -58,7 +60,7 @@ export class GoogleHealthClient {
     const days = Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1;
     if (days > 90) throw new Error("Date range cannot exceed 90 days");
 
-    if (aggregate) {
+    if (aggregate && !SESSION_DATA_TYPES.has(dataType)) {
       return this.request("POST", `/v4/users/me/dataTypes/${encodeURIComponent(dataType)}/dataPoints:dailyRollUp`, {
         range: civilDateRange(start, nextDay(end)),
         windowSizeDays: 1,
@@ -68,7 +70,7 @@ export class GoogleHealthClient {
     }
     const filter = dataPointFilter(dataType, start, nextDay(end));
     const params: Record<string, string> = { filter, pageSize: "100" };
-    if (dataType === "sleep") params.dataSourceFamily = "users/me/dataSourceFamilies/google-wearables";
+    if (SESSION_DATA_TYPES.has(dataType)) params.dataSourceFamily = "users/me/dataSourceFamilies/google-wearables";
     const suffix = new URLSearchParams(params);
     return this.request("GET", `/v4/users/me/dataTypes/${encodeURIComponent(dataType)}/dataPoints:reconcile?${suffix}`);
   }
@@ -80,6 +82,14 @@ export class GoogleHealthClient {
       period: { start, end },
       disclaimer: "Google Health API beta data. This is not medical advice.",
       data: Object.fromEntries(settled.map((result, index) => [types[index], result.status === "fulfilled" ? redact(result.value) : { unavailable: true, reason: safeError(result.reason) }]))
+    };
+  }
+
+  async exercises(start: string, end: string): Promise<Record<string, unknown>> {
+    return {
+      period: { start, end },
+      disclaimer: "Exercise sessions are returned only when a source such as Fitbit recorded them as workouts.",
+      data: await this.query("exercise", start, end, false)
     };
   }
 
@@ -169,6 +179,9 @@ export function dataPointFilter(dataType: string, start: string, endExclusive: s
   const snake = dataType.replace(/-/g, "_");
   if (dataType === "sleep") {
     return `sleep.interval.civil_end_time >= "${start}" AND sleep.interval.civil_end_time < "${endExclusive}"`;
+  }
+  if (dataType === "exercise") {
+    return `exercise.interval.civil_start_time >= "${start}" AND exercise.interval.civil_start_time < "${endExclusive}"`;
   }
   if (dataType.startsWith("daily-")) {
     return `${snake}.date >= "${start}" AND ${snake}.date < "${endExclusive}"`;
