@@ -42,6 +42,7 @@ test("Google Health v4 ranges use CivilDateTime objects", () => {
 test("Google Health v4 reconcile filters use data-type fields", () => {
   assert.equal(dataPointFilter("sleep", "2026-08-13", "2026-08-14"), 'sleep.interval.civil_end_time >= "2026-08-13" AND sleep.interval.civil_end_time < "2026-08-14"');
   assert.equal(dataPointFilter("daily-resting-heart-rate", "2026-08-13", "2026-08-14"), 'daily_resting_heart_rate.date >= "2026-08-13" AND daily_resting_heart_rate.date < "2026-08-14"');
+  assert.equal(dataPointFilter("exercise", "2026-08-13", "2026-08-14"), 'exercise.interval.civil_start_time >= "2026-08-13" AND exercise.interval.civil_start_time < "2026-08-14"');
 });
 
 test("privacy redaction removes identity, tokens and location", () => {
@@ -52,5 +53,6 @@ test("OpenAPI exposes the mobile Actions endpoints with bearer auth", () => {
   const schema = openApi("https://health.example.com") as { paths: Record<string, unknown>; security: unknown[] };
   assert.ok(schema.paths["/api/summary"]);
   assert.ok(schema.paths["/api/data/{dataType}"]);
+  assert.ok(schema.paths["/api/exercises"]);
   assert.deepEqual(schema.security, [{ bearerAuth: [] }]);
 });
