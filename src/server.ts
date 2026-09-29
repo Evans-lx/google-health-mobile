@@ -16,6 +16,15 @@ export function createApp() {
   app.use(express.json({ limit: "256kb" }));
   app.use(express.urlencoded({ extended: false, limit: "32kb" }));
 
+  app.get("/", (_req, res) => res.type("html").send(`<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Evans Health Reader</title></head>
+<body><main style="max-width:720px;margin:10vh auto;font:18px system-ui;padding:24px;line-height:1.6">
+<h1>Evans Health Reader</h1>
+<p>A private, read-only connector that lets its owner retrieve and summarize personal health data after Google OAuth consent.</p>
+<p>OAuth tokens are encrypted at rest. This service does not sell health data, is not affiliated with Google or Fitbit, and is not a medical device.</p>
+<nav><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Service</a></nav>
+</main></body></html>`));
   app.get("/health", (_req, res) => res.json({ ok: true, service: "google-health-mobile" }));
   app.get("/openapi.json", (_req, res) => res.json(openApi(config.baseUrl)));
   app.get("/privacy", (_req, res) => res.type("html").send(page("Privacy", "Health data is fetched only after your Google consent. OAuth tokens are encrypted at rest. This personal service does not sell health data. Disconnecting deletes the locally stored token.")));
