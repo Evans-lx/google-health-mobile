@@ -11,6 +11,9 @@ const ALLOWED_DATA_TYPES = new Set([
 ]);
 
 const SESSION_DATA_TYPES = new Set(["sleep", "exercise"]);
+const SAMPLE_DATA_TYPES = new Set([
+  "heart-rate", "weight", "body-fat", "oxygen-saturation", "respiratory-rate"
+]);
 
 export class GoogleHealthClient {
   readonly store: EncryptedTokenStore;
@@ -68,11 +71,7 @@ export class GoogleHealthClient {
         dataSourceFamily: "users/me/dataSourceFamilies/all-sources"
       });
     }
-    const filter = dataPointFilter(dataType, start, nextDay(end));
-    const params: Record<string, string> = { filter, pageSize: "100" };
-    if (SESSION_DATA_TYPES.has(dataType)) params.dataSourceFamily = "users/me/dataSourceFamilies/google-wearables";
-    const suffix = new URLSearchParams(params);
-    return this.request("GET", `/v4/users/me/dataTypes/${encodeURIComponent(dataType)}/dataPoints:reconcile?${suffix}`);
+    return this.reconcile(dataType, dataPointFilter(dataType, start, nextDay(end)));
   }
 
   async summary(start: string, end: string): Promise<Record<string, unknown>> {
@@ -94,6 +93,32 @@ export class GoogleHealthClient {
   }
 
   async disconnect(): Promise<void> { await this.store.clear(); }
+
+  private async reconcile(dataType: string, filter: string): Promise<Record<string, unknown>> {
+    const dataPoints: unknown[] = [];
+    let pageToken: string | undefined;
+
+    do {
+      const params: Record<string, string> = {
+        filter,
+        pageSize: SESSION_DATA_TYPES.has(dataType) ? "25" : "10000"
+      };
+      if (SESSION_DATA_TYPES.has(dataType)) {
+        params.dataSourceFamily = "users/me/dataSourceFamilies/google-wearables";
+      }
+      if (pageToken) params.pageToken = pageToken;
+
+      const suffix = new URLSearchParams(params);
+      const page = await this.request(
+        "GET",
+        `/v4/users/me/dataTypes/${encodeURIComponent(dataType)}/dataPoints:reconcile?${suffix}`
+      ) as { dataPoints?: unknown[]; nextPageToken?: unknown };
+      if (Array.isArray(page.dataPoints)) dataPoints.push(...page.dataPoints);
+      pageToken = typeof page.nextPageToken === "string" && page.nextPageToken ? page.nextPageToken : undefined;
+    } while (pageToken);
+
+    return { dataPoints };
+  }
 
   private async request(method: "GET" | "POST", path: string, body?: unknown): Promise<unknown> {
     let token = await this.validToken();
@@ -185,6 +210,9 @@ export function dataPointFilter(dataType: string, start: string, endExclusive: s
   }
   if (dataType.startsWith("daily-")) {
     return `${snake}.date >= "${start}" AND ${snake}.date < "${endExclusive}"`;
+  }
+  if (SAMPLE_DATA_TYPES.has(dataType)) {
+    return `${snake}.sample_time.civil_time >= "${start}" AND ${snake}.sample_time.civil_time < "${endExclusive}"`;
   }
   return `${snake}.interval.civil_start_time >= "${start}" AND ${snake}.interval.civil_start_time < "${endExclusive}"`;
 }
