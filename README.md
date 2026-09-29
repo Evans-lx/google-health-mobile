@@ -3,7 +3,7 @@
 这是一个面向个人使用的、只读的 Google Health 桥接服务。它同时提供：
 
 - Custom GPT Actions REST API：部署后可在 ChatGPT 安卓 App 里通过专属 GPT 使用；
-- 远程 MCP `/mcp`：供支持自定义远程 MCP 的客户端使用；
+- 远程 MCP `/mcp`：支持标准 OAuth 2.1、DCR、PKCE 和 token 刷新，可作为 ChatGPT 插件 App 使用；
 - Google OAuth：refresh token 使用 AES-256-GCM 加密后保存；
 - 步数、距离、活动热量、心率、睡眠、体重、体脂等查询与区间摘要。
 
@@ -74,15 +74,19 @@ curl -H "Authorization: Bearer 你的SERVICE_TOKEN" https://你的域名/api/sta
 
 普通聊天不会自动获得这项能力；需要进入这个专属 GPT。Actions/移动端的实际可用性仍取决于你的 ChatGPT 方案、地区及当时的产品支持。
 
-## 4. 远程 MCP
+## 4. ChatGPT 插件 / 远程 MCP
 
-MCP 地址为 `https://你的域名/mcp`，请求头为：
+MCP 地址为 `https://你的域名/mcp`。服务提供以下标准发现端点：
 
 ```text
-Authorization: Bearer 你的SERVICE_TOKEN
+/.well-known/oauth-protected-resource
+/.well-known/oauth-protected-resource/mcp
+/.well-known/oauth-authorization-server
 ```
 
-仓库内 `.mcp.json` 是本地 Codex 插件开发配置。将 `GOOGLE_HEALTH_PUBLIC_URL` 和 `GOOGLE_HEALTH_SERVICE_TOKEN` 设置到客户端环境后再使用。
+在 ChatGPT Developer mode 中添加此 MCP URL。ChatGPT 会通过动态客户端注册（DCR）创建 OAuth 客户端，并用授权码 + PKCE 连接。授权页要求输入 `SETUP_TOKEN` 作为个人连接密钥；该密钥只提交给你自己的服务，不会提供给模型。访问令牌有效期 1 小时，刷新令牌每次使用后轮换。
+
+为兼容旧的 Custom GPT Actions 和开发工具，REST `/api/*` 与 MCP 仍接受原有 `SERVICE_TOKEN`。不要把它写入插件文件。
 
 ## 安全边界
 
@@ -90,7 +94,7 @@ Authorization: Bearer 你的SERVICE_TOKEN
 - 查询范围限制为 90 天，返回值递归移除常见身份、令牌和定位字段。
 - Google refresh token 使用 AES-256-GCM 加密；务必备份加密密钥，丢失后只能重新授权。
 - 这是单用户版本。不要把同一个实例分享给多人；多人服务需要独立用户登录、数据库行级隔离和标准 MCP OAuth。
-- `SERVICE_TOKEN` 等同于读取权限。不要放到公开仓库、聊天消息或客户端日志。
+- `SERVICE_TOKEN` 和 `SETUP_TOKEN` 都等同于敏感凭据。不要放到公开仓库、聊天消息、插件包或客户端日志。
 - 正式公开发布前，需要真实隐私政策/条款域名、Google OAuth 验证及可能的安全评估，也需要遵循 OpenAI 当前的 App 提交流程。
 
 ## 开发验证

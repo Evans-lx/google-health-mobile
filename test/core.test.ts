@@ -7,6 +7,8 @@ import { issueState, verifyState } from "../src/auth.js";
 import { EncryptedTokenStore } from "../src/crypto-store.js";
 import { civilDateRange, dataPointFilter, redact, validateDate } from "../src/google-health.js";
 import { openApi } from "../src/openapi.js";
+import { McpOAuthServer } from "../src/mcp-oauth.js";
+import { createHash, randomBytes } from "node:crypto";
 
 const config = { setupToken: "setup-secret" } as Parameters<typeof issueState>[0];
 
@@ -55,4 +57,40 @@ test("OpenAPI exposes the mobile Actions endpoints with bearer auth", () => {
   assert.ok(schema.paths["/api/data/{dataType}"]);
   assert.ok(schema.paths["/api/exercises"]);
   assert.deepEqual(schema.security, [{ bearerAuth: [] }]);
+});
+
+test("MCP OAuth metadata advertises DCR, PKCE and the protected resource", () => {
+  const oauth = new McpOAuthServer({
+    baseUrl: "https://health.example.com", setupToken: "personal-key", serviceToken: "legacy-token"
+  } as never);
+  assert.deepEqual(oauth.protectedResourceMetadata().authorization_servers, ["https://health.example.com"]);
+  assert.equal(oauth.protectedResourceMetadata().resource, "https://health.example.com/mcp");
+  assert.deepEqual(oauth.authorizationServerMetadata().code_challenge_methods_supported, ["S256"]);
+  assert.equal(oauth.authorizationServerMetadata().registration_endpoint, "https://health.example.com/oauth/register");
+});
+
+test("MCP OAuth authorization code flow validates PKCE and rotates refresh tokens", async () => {
+  const oauth = new McpOAuthServer({
+    baseUrl: "https://health.example.com", setupToken: "personal-key", serviceToken: "legacy-token"
+  } as never);
+  const redirectUri = "https://chatgpt.com/connector_platform_oauth_redirect";
+  const registration = await oauth.registerClient({ redirect_uris: [redirectUri], token_endpoint_auth_method: "none" });
+  const clientId = String(registration.client_id);
+  const verifier = randomBytes(48).toString("base64url");
+  const challenge = createHash("sha256").update(verifier).digest("base64url");
+  const request = await oauth.validateAuthorizationRequest({
+    response_type: "code", client_id: clientId, redirect_uri: redirectUri,
+    code_challenge: challenge, code_challenge_method: "S256", state: "state",
+    scope: "health.read", resource: "https://health.example.com/mcp"
+  });
+  const redirect = new URL(await oauth.approveAuthorization(request, "personal-key"));
+  const tokens = await oauth.token({
+    grant_type: "authorization_code", client_id: clientId, redirect_uri: redirectUri,
+    code: redirect.searchParams.get("code"), code_verifier: verifier
+  });
+  assert.equal(tokens.token_type, "Bearer");
+  assert.equal(await oauth.isAccessTokenValid(String(tokens.access_token)), true);
+  const refreshed = await oauth.token({ grant_type: "refresh_token", client_id: clientId, refresh_token: tokens.refresh_token });
+  assert.notEqual(refreshed.refresh_token, tokens.refresh_token);
+  await assert.rejects(() => oauth.token({ grant_type: "refresh_token", client_id: clientId, refresh_token: tokens.refresh_token }));
 });
