@@ -5,7 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { issueState, verifyState } from "../src/auth.js";
 import { EncryptedTokenStore } from "../src/crypto-store.js";
-import { civilDateRange, dataPointFilter, redact, validateDate } from "../src/google-health.js";
+import { civilDateRange, dataPointFilter, reconcileDataSourceFamily, redact, validateDate } from "../src/google-health.js";
 import { openApi } from "../src/openapi.js";
 import { McpOAuthServer } from "../src/mcp-oauth.js";
 import { createHash, randomBytes } from "node:crypto";
@@ -48,6 +48,12 @@ test("Google Health v4 reconcile filters use data-type fields", () => {
   assert.equal(dataPointFilter("heart-rate", "2026-08-13", "2026-08-14"), 'heart_rate.sample_time.civil_time >= "2026-08-13" AND heart_rate.sample_time.civil_time < "2026-08-14"');
   assert.equal(dataPointFilter("body-fat", "2026-08-13", "2026-08-14"), 'body_fat.sample_time.civil_time >= "2026-08-13" AND body_fat.sample_time.civil_time < "2026-08-14"');
   assert.equal(dataPointFilter("steps", "2026-08-13", "2026-08-14"), 'steps.interval.civil_start_time >= "2026-08-13" AND steps.interval.civil_start_time < "2026-08-14"');
+});
+
+test("exercise reconciliation includes manual entries while sleep stays wearable-only", () => {
+  assert.equal(reconcileDataSourceFamily("exercise"), "users/me/dataSourceFamilies/all-sources");
+  assert.equal(reconcileDataSourceFamily("sleep"), "users/me/dataSourceFamilies/google-wearables");
+  assert.equal(reconcileDataSourceFamily("heart-rate"), undefined);
 });
 
 test("privacy redaction removes identity, tokens and location", () => {

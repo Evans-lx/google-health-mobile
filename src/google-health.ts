@@ -87,7 +87,7 @@ export class GoogleHealthClient {
   async exercises(start: string, end: string): Promise<Record<string, unknown>> {
     return {
       period: { start, end },
-      disclaimer: "Exercise sessions are returned only when a source such as Fitbit recorded them as workouts.",
+      disclaimer: "Exercise sessions include available wearable, phone, Health Connect, and manually logged workouts from Google Health sources.",
       data: await this.query("exercise", start, end, false)
     };
   }
@@ -103,9 +103,8 @@ export class GoogleHealthClient {
         filter,
         pageSize: SESSION_DATA_TYPES.has(dataType) ? "25" : "10000"
       };
-      if (SESSION_DATA_TYPES.has(dataType)) {
-        params.dataSourceFamily = "users/me/dataSourceFamilies/google-wearables";
-      }
+      const dataSourceFamily = reconcileDataSourceFamily(dataType);
+      if (dataSourceFamily) params.dataSourceFamily = dataSourceFamily;
       if (pageToken) params.pageToken = pageToken;
 
       const suffix = new URLSearchParams(params);
@@ -215,6 +214,12 @@ export function dataPointFilter(dataType: string, start: string, endExclusive: s
     return `${snake}.sample_time.civil_time >= "${start}" AND ${snake}.sample_time.civil_time < "${endExclusive}"`;
   }
   return `${snake}.interval.civil_start_time >= "${start}" AND ${snake}.interval.civil_start_time < "${endExclusive}"`;
+}
+
+export function reconcileDataSourceFamily(dataType: string): string | undefined {
+  if (dataType === "sleep") return "users/me/dataSourceFamilies/google-wearables";
+  if (dataType === "exercise") return "users/me/dataSourceFamilies/all-sources";
+  return undefined;
 }
 
 const SENSITIVE_KEYS = /^(access.?token|refresh.?token|authorization|email|name|display.?name|avatar|latitude|longitude|coordinates|route|gps)$/i;
